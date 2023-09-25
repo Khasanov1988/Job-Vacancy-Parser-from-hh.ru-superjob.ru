@@ -6,16 +6,19 @@ import psycopg2
 import requests
 
 
+# Custom exception class for API parsing errors
 class ParsingError(Exception):
     def __str__(self):
-        return 'Ошибка получения данных по API.'
+        return 'Error fetching data from the API.'
 
 
+# Custom exception class for CSV instantiation errors
 class InstantiateCSVError(Exception):
     def __str__(self):
-        return 'В структуре файла csv не хватает данных'
+        return 'CSV file structure lacks necessary data.'
 
 
+# Class for interacting with the HeadHunter API
 class HeadHunterAPI:
     def __init__(self):
         self.__header = {
@@ -25,6 +28,7 @@ class HeadHunterAPI:
         self.__vacancies = []
         self.__employers = {}
 
+    # Method to make an API request to get employer data
     def get_request_employer(self, employer_id):
         response = requests.get(f'https://api.hh.ru/employers/{employer_id}',
                                 headers=self.__header,
@@ -33,6 +37,7 @@ class HeadHunterAPI:
             raise ParsingError
         return response.json()
 
+    # Method to make an API request to get vacancy data
     def get_request_vacancy(self):
         response = requests.get('https://api.hh.ru/vacancies',
                                 headers=self.__header,
@@ -41,6 +46,7 @@ class HeadHunterAPI:
             raise ParsingError
         return response.json()['items']
 
+    # Method to retrieve vacancies for a given employer
     def get_vacancies(self, employer_id, page_count=1):
         self.__params = {
             "employer_id": employer_id,
@@ -53,20 +59,21 @@ class HeadHunterAPI:
         self.__vacancies = []
         while self.__params['page'] < page_count:
             print(
-                f"HeadHunter, Парсинг страницы {self.__params['page'] + 1} для работодателя {self.employers[employer_id]['name']}",
+                f"HeadHunter, Parsing page {self.__params['page'] + 1} for employer {self.employers[employer_id]['name']}",
                 end=": ")
             try:
                 values = self.get_request_vacancy()
             except ParsingError:
-                print('Ошибка получения данных!')
+                print('Error fetching data!')
                 break
-            print(f"Найдено ({len(values)}) вакансий.")
+            print(f"Found ({len(values)}) vacancies.")
             if len(values) == 0:
                 break
             self.__vacancies.extend(values)
             self.__params['page'] += 1
             time.sleep(1)
 
+    # Method to retrieve employer data and associated vacancies
     def get_employer(self, employer_id):
         self.__params = {
             "locale": "RU",
@@ -75,35 +82,35 @@ class HeadHunterAPI:
         try:
             values = self.get_request_employer(employer_id)
         except ParsingError:
-            print('Ошибка получения данных!')
+            print('Error fetching data!')
         self.__employers[employer_id] = values
-        self.get_vacancies(employer_id, 1)  # Тут нужно последним параметром задать количество страниц парсинга вакансий
+        self.get_vacancies(employer_id, 1)  # Here, you need to specify the number of pages for vacancy parsing
         self.__employers[employer_id]["vacancies"] = self.__vacancies
 
+    # Method to instantiate data from a CSV file
     def instantiate_from_csv(self, file_name: str):
         """
-        Метод, заполняющий экземпляр класса данными о работодателях и их вакансиях в соответствии с файлом - списком
-        работодателей file_name
+        Method that fills the class instance with data about employers and their vacancies based on the CSV file - a list
+        of employers file_name
         """
         try:
             csvfile = open(os.path.join(os.path.dirname(__file__), file_name), encoding="utf-8", newline='')
         except FileNotFoundError:
-            raise FileNotFoundError('Отсутствует файл csv')
+            raise FileNotFoundError('CSV file not found')
         else:
             data = csv.DictReader(csvfile)
             if 'id' in data.fieldnames:
                 for row in data:
                     self.get_employer(row['id'])
             else:
-                raise InstantiateCSVError(f"В структуре файла {file_name} не хватает данных")
+                raise InstantiateCSVError(f"CSV file {file_name} lacks necessary data")
             csvfile.close()
 
     @staticmethod
     def create_database(database_name: str):
         """
-        Создание базы данных и таблиц для сохранения данных о работодателях и вакансиях.
+        Create a database and tables for storing data about employers and vacancies.
         """
-
         conn = psycopg2.connect(dbname='postgres',
                                 host='localhost',
                                 user='postgres',
@@ -152,9 +159,10 @@ class HeadHunterAPI:
         conn.commit()
         conn.close()
 
+    # Method to save data to a database
     def save_data_to_database(self, database_name: str):
         """
-        Метод сохраняет полученные данные о работодателях и их вакансиях в таблицы базы данных
+        Method to save received data about employers and their vacancies to database tables
         :return:
         """
         conn = psycopg2.connect(dbname=database_name,
@@ -193,7 +201,7 @@ class HeadHunterAPI:
                         vacancy_currency = None
 
                     elif vacancy["salary"]["to"] is not None and vacancy["salary"]["from"] is not None:
-                        vacancy_salary = (vacancy["salary"]["to"] + vacancy["salary"]["from"])/2
+                        vacancy_salary = (vacancy["salary"]["to"] + vacancy["salary"]["from"]) / 2
                         vacancy_currency = vacancy["salary"]["currency"]
                     elif vacancy["salary"]["to"] is not None:
                         vacancy_salary = vacancy["salary"]["to"]
