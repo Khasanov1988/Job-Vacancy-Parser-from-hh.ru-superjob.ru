@@ -1,8 +1,8 @@
 import csv
 import os
 
-from get_data import HeadHunterAPI
-from DBManager import DBManager
+from src.get_data import HeadHunterAPI
+from src.DBManager import DBManager
 
 
 def main():
@@ -32,7 +32,7 @@ def main():
         try:
             if inp == "1":
                 # Display all selected companies from the CSV file
-                csvfile = open(os.path.join(os.path.dirname(__file__), "employers.csv"), encoding="utf-8", newline='')
+                csvfile = open(os.path.join(os.path.dirname(__file__), "src/employers.csv"), encoding="utf-8", newline='')
                 data = csv.DictReader(csvfile)
                 for row in data:
                     print(row['Employer'])
